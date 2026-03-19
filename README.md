@@ -36,7 +36,7 @@ bash setup.sh
 
 # 3. Filter your dataset
 source score_lerobot_episodes/.venv/bin/activate
-python filter_dataset.py \
+python curate_dataset.py \
     --repo_id your-hf-username/your-lerobot-dataset \
     --task_description "pick up the orange cube and place it in the blue container" \
     --output filtered_dataset/
@@ -74,7 +74,7 @@ bash setup.sh
 Scores every episode on technical and semantic dimensions, then saves a filtered copy containing only episodes that pass both thresholds.
 
 ```bash
-python filter_dataset.py \
+python curate_dataset.py \
     --repo_id your-hf-username/your-dataset \
     --task_description "your task description" \
     --output path/to/filtered_dataset/ \
@@ -163,7 +163,7 @@ The FS blocks were trained only on semantic failure conditions. The 72–76% acc
 lerobot-data-curator/
 ├── README.md
 ├── setup.sh                          # environment setup
-├── filter_dataset.py                 # main entry point
+├── curate_dataset.py                 # main entry point
 ├── docs/
 │   └── train_your_own_fs_blocks.md  # guide for custom FS block training
 ├── score_lerobot_episodes/           # submodule (semantic-scoring branch)

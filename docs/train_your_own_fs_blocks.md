@@ -104,8 +104,8 @@ Expected training time on RTX 3080: 1–3 hours depending on dataset size.
 ## Using your trained weights
 
 ```bash
-# With filter_dataset.py
-python filter_dataset.py \
+# With curate_dataset.py
+python curate_dataset.py \
     --repo_id your-user/your-dataset \
     --task_description "your task description" \
     --fs_weights checkpoints/my_fs_blocks/best_model.pt \
@@ -148,7 +148,7 @@ api.upload_file(
 
 Then others can use your weights with:
 ```bash
-python filter_dataset.py \
+python curate_dataset.py \
     --fs_weights your-user/failsense-fs-blocks-your-task \
     ...
 ```

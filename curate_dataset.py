@@ -1,11 +1,16 @@
 """
-filter_dataset.py — top-level entry point for lerobot-data-curator.
+curate_dataset.py — top-level entry point for lerobot-data-curator.
 
-Scores a LeRobot dataset on both technical and semantic dimensions and saves
-a filtered copy containing only episodes that pass both thresholds.
+Scores a LeRobot dataset on both technical and semantic dimensions, prints
+per-episode scores to the terminal, saves them to results/<repo_name>_scores.json,
+and writes a filtered copy containing only episodes that pass both thresholds.
+
+Note: if you only want scores without saving a filtered dataset (e.g. to explore
+thresholds first), use score_dataset.py in the score_lerobot_episodes submodule
+directly and omit its --output argument.
 
 Usage:
-    python filter_dataset.py \\
+    python curate_dataset.py \\
         --repo_id your-hf-username/your-dataset \\
         --task_description "pick up the orange cube and place it in the blue container" \\
         --output filtered_dataset/
