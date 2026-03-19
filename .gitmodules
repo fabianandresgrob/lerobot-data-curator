@@ -1,0 +1,9 @@
+[submodule "score_lerobot_episodes"]
+	path = score_lerobot_episodes
+	url = https://github.com/fabianandresgrob/score_lerobot_episodes.git
+	branch = main
+
+[submodule "I-FailSense"]
+	path = I-FailSense
+	url = https://github.com/fabianandresgrob/I-FailSense.git
+	branch = main
