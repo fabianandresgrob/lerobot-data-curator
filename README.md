@@ -99,6 +99,18 @@ python curate_dataset.py \
 
 The output is a valid LeRobot dataset that can be used directly for policy training.
 
+### Explore results interactively
+
+After scoring, launch the results explorer to visualize technical and semantic scores, compare conditions, and interactively adjust thresholds:
+
+```bash
+streamlit run ui.py -- --results_dir path/to/results/
+```
+
+The explorer shows a 2D scatter of technical vs semantic score per episode (colored by `GOOD / FAIL_SEMANTIC / FAIL_TECHNICAL / FAIL_BOTH`), score distributions, per-criterion boxplots, and a filterable episode table. The compare tab overlays all conditions side by side.
+
+---
+
 ### Score only (no filtering)
 
 To inspect scores without saving a filtered dataset:

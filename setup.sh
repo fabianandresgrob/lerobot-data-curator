@@ -27,6 +27,9 @@ uv pip install -e "$REPO_ROOT/I-FailSense" --no-deps --python "$PYTHON"
 echo "==> Installing huggingface_hub for weight auto-download"
 uv pip install huggingface_hub --python "$PYTHON"
 
+echo "==> Installing UI dependencies"
+uv pip install streamlit plotly --python "$PYTHON"
+
 echo ""
 echo "Setup complete. Activate the environment with:"
 echo "  source score_lerobot_episodes/.venv/bin/activate"
