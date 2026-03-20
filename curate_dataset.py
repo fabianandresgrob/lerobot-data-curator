@@ -102,6 +102,12 @@ Examples:
                          "If omitted, estimated from the dataset median.")
     ap.add_argument("--video_backend", default="pyav",
                     help="Video backend for LeRobot dataset loading (default: pyav).")
+    ap.add_argument("--push_to_hub", action="store_true",
+                    help="Push the filtered dataset to HuggingFace Hub after writing.")
+    ap.add_argument("--output_repo_id", default=None,
+                    help="HuggingFace repo ID to push the filtered dataset to. "
+                         "Required when --push_to_hub is set. "
+                         "Example: fabiangrob/pick_place_mixed_failsense")
     args = ap.parse_args()
 
     # Resolve FS weights
@@ -142,6 +148,18 @@ Examples:
     sys.argv = score_argv
     import score_dataset
     score_dataset.main()
+
+    # Optionally push the filtered dataset to HuggingFace Hub
+    if args.push_to_hub:
+        if not args.output_repo_id:
+            print("Error: --output_repo_id is required when --push_to_hub is set.")
+            sys.exit(1)
+        from lerobot.datasets.lerobot_dataset import LeRobotDataset
+        output_path = Path(args.output)
+        print(f"\nPushing filtered dataset to HuggingFace Hub as {args.output_repo_id}...")
+        ds = LeRobotDataset(args.output_repo_id, root=output_path)
+        ds.push_to_hub()
+        print("Push complete.")
 
 
 if __name__ == "__main__":
