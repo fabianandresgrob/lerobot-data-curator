@@ -24,6 +24,9 @@ uv pip install -e . --python "$PYTHON"
 echo "==> Installing I-FailSense (--no-deps to preserve torch version)"
 uv pip install -e "$REPO_ROOT/I-FailSense" --no-deps --python "$PYTHON"
 
+echo "==> Installing I-FailSense dependencies (excluding torch to avoid version conflict)"
+uv pip install peft scikit-learn seaborn matplotlib --python "$PYTHON"
+
 echo "==> Installing huggingface_hub for weight auto-download"
 uv pip install huggingface_hub --python "$PYTHON"
 
@@ -34,5 +37,15 @@ echo ""
 echo "Setup complete. Activate the environment with:"
 echo "  source score_lerobot_episodes/.venv/bin/activate"
 echo ""
+
+# Check for system ffmpeg
+if ! command -v ffprobe &>/dev/null; then
+    echo "WARNING: ffprobe not found. The technical scorer requires system ffmpeg."
+    echo "Install it with:"
+    echo "  sudo apt-get install ffmpeg      # Ubuntu/Debian"
+    echo "  conda install -c conda-forge ffmpeg  # Conda"
+    echo ""
+fi
+
 echo "Then filter a dataset with:"
 echo "  python curate_dataset.py --repo_id your/dataset --task_description '...' --output filtered/"
