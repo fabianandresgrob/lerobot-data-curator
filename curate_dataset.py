@@ -150,16 +150,79 @@ Examples:
     import score_dataset
     score_dataset.main()
 
-    # Optionally push the filtered dataset to HuggingFace Hub
+    # Optionally create filtered dataset and push to HuggingFace Hub.
+    # We use lerobot's _delete_episodes directly because the built-in
+    # save_filtered_dataset is incomplete for v3.0 datasets.
     if args.push_to_hub:
         if not args.output_repo_id:
             print("Error: --output_repo_id is required when --push_to_hub is set.")
             sys.exit(1)
+
+        import json as _json
         from lerobot.datasets.lerobot_dataset import LeRobotDataset
+        from lerobot.datasets.dataset_tools import delete_episodes as _delete_episodes
+
         output_path = Path(args.output)
-        print(f"\nPushing filtered dataset to HuggingFace Hub as {args.output_repo_id}...")
-        ds = LeRobotDataset(args.output_repo_id, root=output_path)
-        ds.push_to_hub()
+
+        # Read the scores that score_dataset.main() just saved
+        repo_name = args.repo_id.replace("/", "_")
+        scores_path = REPO_ROOT / "results" / f"{repo_name}_scores.json"
+        if not scores_path.exists():
+            # score_dataset.py saves to cwd/results/, try that too
+            scores_path = Path("results") / f"{repo_name}_scores.json"
+
+        print(f"\nReading scores from {scores_path}...")
+        with open(scores_path) as f:
+            score_data = _json.load(f)
+
+        # Determine good episodes (min technical score across cameras + semantic)
+        ep_tech: dict[int, float] = {}
+        ep_sem: dict[int, float | None] = {}
+        for entry in score_data:
+            ep = entry["episode_id"]
+            tech = entry["aggregate_score"]
+            sem = entry.get("semantic_score")
+            ep_tech[ep] = tech if ep not in ep_tech else min(ep_tech[ep], tech)
+            if sem is not None:
+                ep_sem[ep] = sem
+
+        good = []
+        for ep in sorted(ep_tech):
+            passes_tech = ep_tech[ep] >= args.technical_threshold
+            if args.no_semantic:
+                passes_sem = True
+            else:
+                s = ep_sem.get(ep)
+                passes_sem = s is not None and s >= args.semantic_threshold
+            if passes_tech and passes_sem:
+                good.append(ep)
+
+        total = len(ep_tech)
+        delete_idx = [ep for ep in range(total) if ep not in set(good)]
+        print(f"Keeping {len(good)}/{total} episodes, removing {len(delete_idx)}")
+
+        # Load original dataset and create filtered copy
+        ds_orig = LeRobotDataset(args.repo_id, root=args.root or None)
+        if output_path.exists():
+            import shutil
+            shutil.rmtree(str(output_path))
+
+        if delete_idx:
+            print(f"Writing filtered dataset to {output_path}...")
+            _delete_episodes(
+                ds_orig,
+                episode_indices=delete_idx,
+                output_dir=output_path,
+                repo_id=args.output_repo_id,
+            )
+        else:
+            import shutil
+            src = Path(ds_orig.root) if hasattr(ds_orig, 'root') else Path(args.root) / args.repo_id
+            shutil.copytree(str(src), str(output_path))
+
+        print(f"Pushing filtered dataset to HuggingFace Hub as {args.output_repo_id}...")
+        filtered_ds = LeRobotDataset(args.output_repo_id, root=output_path)
+        filtered_ds.push_to_hub()
         print("Push complete.")
 
 
