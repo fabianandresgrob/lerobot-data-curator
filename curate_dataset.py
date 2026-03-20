@@ -137,6 +137,7 @@ Examples:
         score_argv += ["--root", args.root]
     if args.nominal is not None:
         score_argv += ["--nominal", str(args.nominal)]
+    score_argv += ["--video_backend", args.video_backend]
     if not args.no_semantic:
         score_argv += [
             "--semantic",
