@@ -111,7 +111,12 @@ def load_semantic(path: str) -> pd.DataFrame:
 
 def merge_scores(tech_df: pd.DataFrame, sem_df: pd.DataFrame,
                  tech_thresh: float, sem_thresh: float) -> pd.DataFrame:
-    df = pd.merge(tech_df, sem_df[["episode_id", "semantic"]], on="episode_id", how="outer")
+    sem_cols = ["episode_id", "semantic"]
+    if "ground_truth" in sem_df.columns:
+        sem_cols.append("ground_truth")
+    if "condition" in sem_df.columns:
+        sem_cols.append("condition")
+    df = pd.merge(tech_df, sem_df[sem_cols], on="episode_id", how="outer")
     p_tech = df["aggregate"] >= tech_thresh
     p_sem  = df["semantic"]  >= sem_thresh
 
@@ -238,8 +243,43 @@ def main():
 
         st.markdown("---")
         st.header("Thresholds")
-        tech_thresh = st.slider("Technical threshold", 0.0, 1.0, 0.5, 0.05)
-        sem_thresh  = st.slider("Semantic threshold",  0.0, 1.0, 0.5, 0.05)
+
+        # Initialise shared threshold state
+        for k, v in [("tech_thresh", 0.5), ("sem_thresh", 0.5)]:
+            if k not in st.session_state:
+                st.session_state[k] = v
+
+        def _sync(src, dst, shared):
+            st.session_state[shared] = st.session_state[src]
+            st.session_state[dst]    = st.session_state[src]
+
+        t_col1, t_col2 = st.columns([3, 1])
+        with t_col1:
+            st.slider("Technical threshold", 0.0, 1.0, step=0.01,
+                      key="_tech_slider",
+                      value=st.session_state["tech_thresh"],
+                      on_change=_sync, args=("_tech_slider", "_tech_num", "tech_thresh"))
+        with t_col2:
+            st.number_input("", 0.0, 1.0, step=0.01, format="%.2f",
+                            key="_tech_num",
+                            value=st.session_state["tech_thresh"],
+                            on_change=_sync, args=("_tech_num", "_tech_slider", "tech_thresh"),
+                            label_visibility="hidden")
+        tech_thresh = st.session_state["tech_thresh"]
+
+        s_col1, s_col2 = st.columns([3, 1])
+        with s_col1:
+            st.slider("Semantic threshold", 0.0, 1.0, step=0.01,
+                      key="_sem_slider",
+                      value=st.session_state["sem_thresh"],
+                      on_change=_sync, args=("_sem_slider", "_sem_num", "sem_thresh"))
+        with s_col2:
+            st.number_input("", 0.0, 1.0, step=0.01, format="%.2f",
+                            key="_sem_num",
+                            value=st.session_state["sem_thresh"],
+                            on_change=_sync, args=("_sem_num", "_sem_slider", "sem_thresh"),
+                            label_visibility="hidden")
+        sem_thresh = st.session_state["sem_thresh"]
 
     if not selected:
         st.info("Select at least one condition in the sidebar.")
@@ -296,6 +336,90 @@ def main():
         c3.metric("FAIL_SEMANTIC",  (df["status"] == "FAIL_SEMANTIC").sum())
         c4.metric("FAIL_TECHNICAL", (df["status"] == "FAIL_TECHNICAL").sum())
         c5.metric("FAIL_BOTH",      (df["status"] == "FAIL_BOTH").sum())
+
+        # ── Filtering quality panel (only when ground truth is available) ──────
+        has_gt = "ground_truth" in df.columns and df["ground_truth"].notna().any()
+        if has_gt:
+            kept = df[df["status"] == "GOOD"]
+            removed = df[df["status"] != "GOOD"]
+
+            n_clean_total   = (df["ground_truth"] == 1).sum()
+            n_bad_total     = (df["ground_truth"] == 0).sum()
+            n_clean_kept    = (kept["ground_truth"] == 1).sum()
+            n_clean_removed = (removed["ground_truth"] == 1).sum()
+            n_bad_kept      = (kept["ground_truth"] == 0).sum()
+            n_bad_removed   = (removed["ground_truth"] == 0).sum()
+
+            clean_retention = n_clean_kept / n_clean_total if n_clean_total > 0 else 0
+            bad_recall      = n_bad_removed / n_bad_total  if n_bad_total  > 0 else 0
+            purity          = n_clean_kept / len(kept)     if len(kept)    > 0 else 0
+            noise_remaining = n_bad_kept
+
+            st.markdown("---")
+            st.subheader("Filtering quality (ground truth available)")
+            st.caption("Shows how well the current thresholds clean the dataset — only possible because this is a simulated dataset with known labels.")
+
+            q1, q2, q3, q4 = st.columns(4)
+            q1.metric("Clean episodes kept",
+                      f"{n_clean_kept} / {n_clean_total}",
+                      f"{clean_retention*100:.1f}%",
+                      delta_color="normal")
+            q2.metric("Bad episodes removed",
+                      f"{n_bad_removed} / {n_bad_total}",
+                      f"{bad_recall*100:.1f}%",
+                      delta_color="normal")
+            q3.metric("Dataset purity after filtering",
+                      f"{purity*100:.1f}%",
+                      help="Fraction of kept episodes that are actually clean.")
+            q4.metric("Noise remaining",
+                      noise_remaining,
+                      f"{n_bad_kept/len(kept)*100:.1f}% of kept" if len(kept) > 0 else "—",
+                      delta_color="inverse")
+
+            # Confusion matrix as a stacked bar
+            cm_df = pd.DataFrame({
+                "Group":  ["Clean", "Clean", "Bad", "Bad"],
+                "Outcome": ["Kept", "Removed", "Kept (noise)", "Removed"],
+                "Count":  [n_clean_kept, n_clean_removed, n_bad_kept, n_bad_removed],
+            })
+            cm_colors = {
+                "Kept":           "#2ecc71",
+                "Removed":        "#e74c3c",
+                "Kept (noise)":   "#f39c12",
+            }
+            fig_cm = px.bar(
+                cm_df, x="Group", y="Count", color="Outcome",
+                color_discrete_map=cm_colors,
+                title="Filtering outcome by ground truth label",
+                text="Count",
+            )
+            fig_cm.update_traces(textposition="inside")
+            fig_cm.update_layout(height=320)
+
+            # Per-condition breakdown of bad episodes kept vs removed
+            if "condition" in df.columns:
+                bad_df = df[df["ground_truth"] == 0].copy()
+                bad_df["outcome"] = bad_df["status"].apply(
+                    lambda s: "Removed" if s != "GOOD" else "Kept (noise)")
+                cond_counts = (
+                    bad_df.groupby(["condition", "outcome"])
+                    .size().reset_index(name="count")
+                )
+                fig_cond = px.bar(
+                    cond_counts, x="condition", y="count", color="outcome",
+                    color_discrete_map={"Removed": "#2ecc71", "Kept (noise)": "#f39c12"},
+                    barmode="stack",
+                    title="Bad episodes: removed vs kept, per condition",
+                    labels={"count": "Episodes", "condition": "Condition"},
+                )
+                fig_cond.update_layout(height=320)
+                col_cm, col_cond = st.columns(2)
+                with col_cm:
+                    st.plotly_chart(fig_cm, use_container_width=True)
+                with col_cond:
+                    st.plotly_chart(fig_cond, use_container_width=True)
+            else:
+                st.plotly_chart(fig_cm, use_container_width=True)
 
         st.markdown("---")
 
