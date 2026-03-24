@@ -477,14 +477,15 @@ def main():
         filt = st.selectbox("Filter by status", status_opts, key="single_filter")
         show_df = df if filt == "All" else df[df["status"] == filt]
 
-        float_fmt = lambda x: f"{x:.3f}" if pd.notna(x) else "—"
+        float_fmt = lambda x: f"{x:.3f}" if isinstance(x, (int, float)) and pd.notna(x) else str(x)
         fmt = {}
         if "aggregate" in show_df.columns:
             fmt["aggregate"] = float_fmt
         if "semantic" in show_df.columns:
             fmt["semantic"] = float_fmt
-        criteria = [c for c in show_df.columns
-                    if c not in ("episode_id", "aggregate", "semantic", "status")]
+        numeric_cols = show_df.select_dtypes(include="number").columns
+        criteria = [c for c in numeric_cols
+                    if c not in ("episode_id", "aggregate", "semantic")]
         fmt.update({c: float_fmt for c in criteria})
 
         def color_status(val):
@@ -496,7 +497,7 @@ def main():
             }
             return colors.get(val, "")
 
-        styled = show_df.style.format(fmt).applymap(color_status, subset=["status"])
+        styled = show_df.style.format(fmt).map(color_status, subset=["status"])
         st.dataframe(styled, use_container_width=True)
 
     # ══════════════════════════════════════════════════════════════════════════
